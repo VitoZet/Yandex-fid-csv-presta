@@ -131,13 +131,13 @@ def min_price_combinations_product_and_reference(product_ids_combinations, price
     Возвращает список артикулов для добавления в дискрипшн
     '''
     list_price_combinations = []
-    list_referance = []
+    list_reference = []
     for id_combination in product_ids_combinations:
         combinations_api = api.get('combinations/' + str(id_combination))
         list_price_combinations.append(float(combinations_api['combination']['price']) + price_product_default)
-        list_referance.append(combinations_api['combination']['reference'])
+        list_reference.append(combinations_api['combination']['reference'])
 
-    return min(list_price_combinations), list_referance
+    return min(list_price_combinations), list_reference
 
 def removes_html_tags(description_html):
     '''
@@ -183,15 +183,15 @@ def parsing_product(list_on_stock, id_category):
 
 
         try:
-            list_referance = min_price_combinations_product_and_reference(product_ids_combinations(id_product), price_product_default)[1]
+            list_reference = min_price_combinations_product_and_reference(product_ids_combinations(id_product), price_product_default)[1]
         except:
-            list_referance = [product_api['product']['reference']]
+            list_reference = [product_api['product']['reference']]
 
 
         try:
-            description = removes_html_tags(product_api['product']['description']['language']['#text']) + ' Артикулы: ' + ', '.join(list_referance)
+            description = removes_html_tags(product_api['product']['description']['language']['#text']) + ' Артикулы: ' + ', '.join(list_reference)
         except:
-            description = 'Описание в процесе наплнения' + 'Артикулы: ' + ', '.join(list_referance)
+            description = 'Описание в процесе наплнения' + 'Артикулы: ' + ', '.join(list_reference)
 
         if product_ids_combinations(id_product):
             price = min_price_combinations_product_and_reference(product_ids_combinations(id_product), price_product_default)[0]
