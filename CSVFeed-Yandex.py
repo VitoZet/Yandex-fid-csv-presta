@@ -1,23 +1,26 @@
+from settings import api_key, api_url
 from prestashop_api import PrestashopApi
 from bs4 import BeautifulSoup
 from datetime import datetime
 import csv
 
 
-api_url = 'https://fisherpoint.ru/api'
-api_key = ''
 
 
 api = PrestashopApi(api_url, api_key)
 
-def id_products_category(input_categoty):
+def get_product_ids(id_category):
     '''
     Получаем список id товаров из выбраной категории
     '''
-    product_api = api.get('categories/'+str(input_categoty))
-    list_id_products_category = [id_product['id'] for id_product in product_api['category']['associations']['products']['product']]
-    print(len(list_id_products_category))
-    return list_id_products_category
+    try:
+        product_api = api.get('categories/'+str(id_category))
+        list_id_products_category = [id_product['id'] for id_product in
+                                     product_api['category']['associations']['products']['product']]
+        return list_id_products_category
+    except:
+        print('Нет доступа по API, похоже сайт лёг')
+
 
 def sorting_activity_id(list_id_products_category):
     '''
@@ -41,7 +44,7 @@ def sorting_activity_id(list_id_products_category):
             else:
                 list_product_not_active.append(id_product)
         except:
-            list_id_product_error.append(id_product)
+            print('Нет доступа по API, похоже сайт лёг')
 
     print('Всего активных ID: ' + str(len(list_product_active)) + ' шт.')
     print('_____________')
@@ -51,9 +54,9 @@ def sorting_activity_id(list_id_products_category):
     print('Удаленные ID: ' + str(len(list_id_product_error)) + ' шт.')
     print(list_id_product_error)
 
-    fileNoActiveID = open('NoActiveID-'+str(datetime.now().strftime("%Y%m%d-%H%M%S"))+'.txt', 'w')
-    fileNoActiveID.write("\n".join(list_product_not_active))
-    fileNoActiveID.close()
+    file_no_active_id = open('NoActiveID-'+str(datetime.now().strftime("%Y%m%d-%H%M%S"))+'.txt', 'w')
+    file_no_active_id.write("\n".join(list_product_not_active))
+    file_no_active_id.close()
 
     fileErrorID = open('ErrorID-'+str(datetime.now().strftime("%Y%m%d-%H%M%S"))+'.txt', 'w')
     fileErrorID.writelines("\n".join(list_id_product_error))
@@ -64,7 +67,7 @@ def sorting_activity_id(list_id_products_category):
 
 
 
-def id_on_stock(sorting_activity_id):
+def get_product_ids_in_stock(sorting_activity_id):
     '''
     Возращает  список ID товаров в наличии
     Сохраняет файл тхт ID товаров не в наличии
@@ -75,11 +78,14 @@ def id_on_stock(sorting_activity_id):
 
     for e,id_stock in enumerate(sorting_activity_id):
         print('Сортирую по наличию. Осталось: ' + str(len(sorting_activity_id) - e))
-        id_stock_api = api.get('products/' + str(id_stock))
-        if int(id_stock_api['product']['quantity']['#text']) > 0:
-            list_on_stock.append(id_stock)
-        else:
-            list_not_stock.append(id_stock)
+        try:
+            id_stock_api = api.get('products/' + str(id_stock))
+            if int(id_stock_api['product']['quantity']['#text']) > 0:
+                list_on_stock.append(id_stock)
+            else:
+                list_not_stock.append(id_stock)
+        except:
+            print('Нет доступа по API, похоже сайт лёг')
 
     print('Всего ID в наличии: ' + str(len(list_on_stock)) + ' шт.')
     # print(list_on_stock)
@@ -94,7 +100,7 @@ def id_on_stock(sorting_activity_id):
     return list_on_stock
 
 
-def id_combination_product(id_product):
+def product_ids_combinations(id_product):
     '''
     Проверка на наличие комбиннаций, возвращает список id комбинаций
     Если кобинаций товара нет, возращает пустой список.
@@ -118,7 +124,7 @@ def id_combination_product(id_product):
     return list_id_combination_product
 
 
-def min_price_combinations_product_and_referance(id_combination_product, price_product_default):
+def min_price_combinations_product_and_reference(product_ids_combinations, price_product_default):
     '''
     Возвращает минимальную стоимость комбинации которая есть в наличии
     Если комбинаций нет возращает цену по уолчанию
@@ -126,7 +132,7 @@ def min_price_combinations_product_and_referance(id_combination_product, price_p
     '''
     list_price_combinations = []
     list_referance = []
-    for id_combination in id_combination_product:
+    for id_combination in product_ids_combinations:
         combinations_api = api.get('combinations/' + str(id_combination))
         list_price_combinations.append(float(combinations_api['combination']['price']) + price_product_default)
         list_referance.append(combinations_api['combination']['reference'])
@@ -140,7 +146,7 @@ def removes_html_tags(description_html):
     soup = BeautifulSoup(description_html, "lxml")
     return soup.get_text().strip()
 
-def parsing_product(list_on_stock, input_category):
+def parsing_product(list_on_stock, id_category):
     '''
     Парсим продукт
     '''
@@ -153,8 +159,13 @@ def parsing_product(list_on_stock, input_category):
     for e, id_product in enumerate(list_on_stock):
 
         print('Парсинг - ID: ' + str(id_product) + ' Осталось: ' + str(len(list_on_stock) - e))
-        product_api = api.get('products/' + str(id_product))
-        category_api = api.get('categories/' + str(input_category))
+
+        try:
+            product_api = api.get('products/' + str(id_product))
+            category_api = api.get('categories/' + str(id_category))
+            category = category_api['category']['name']['language']['#text']
+        except:
+            print('Нет доступа по API, похоже сайт лёг')
 
         id = product_api['product']['id']
         friendly_URL = str(product_api['product']['link_rewrite']['language']['#text'])
@@ -168,13 +179,11 @@ def parsing_product(list_on_stock, input_category):
 
         name = product_api['product']['name']['language']['#text']
 
-        category = category_api['category']['name']['language']['#text']
-
         price_product_default = float(product_api['product']['price'])
 
 
         try:
-            list_referance = min_price_combinations_product_and_referance(id_combination_product(id_product), price_product_default)[1]
+            list_referance = min_price_combinations_product_and_reference(product_ids_combinations(id_product), price_product_default)[1]
         except:
             list_referance = [product_api['product']['reference']]
 
@@ -184,8 +193,8 @@ def parsing_product(list_on_stock, input_category):
         except:
             description = 'Описание в процесе наплнения' + 'Артикулы: ' + ', '.join(list_referance)
 
-        if id_combination_product(id_product):
-            price = min_price_combinations_product_and_referance(id_combination_product(id_product), price_product_default)[0]
+        if product_ids_combinations(id_product):
+            price = min_price_combinations_product_and_reference(product_ids_combinations(id_product), price_product_default)[0]
 
         else:
             price = price_product_default
@@ -205,5 +214,5 @@ def csv_writer(data_products):
 
 
 if __name__ == '__main__':
-    input_category = input('Введите ID категории, для которой требуеться создать Тоаварный Фид Яндекса: ')
-    csv_writer(parsing_product(id_on_stock(sorting_activity_id(id_products_category(input_category))), input_category))
+    id_category = input('Введите ID категории, для которой требуеться создать Тоаварный Фид Яндекса: ')
+    csv_writer(parsing_product(get_product_ids_in_stock(sorting_activity_id(get_product_ids(id_category))), id_category))
